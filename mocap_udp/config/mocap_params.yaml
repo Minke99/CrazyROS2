@@ -1,0 +1,4 @@
+mocap_udp_node:
+  ros__parameters:
+    udp_port: 22222
+    timer_period: 0.005

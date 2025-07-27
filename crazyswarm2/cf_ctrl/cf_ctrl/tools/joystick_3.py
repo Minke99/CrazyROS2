@@ -21,6 +21,18 @@ class PygameJoystick:
                                'Up': 11, 'Down': 12, 'Left': 13, 'Right': 14,
                                'L2': 104, 'R2': 105,
                                'LeftStickX': 100, 'LeftStickY': 101, 'RightStickX': 102, 'RightStickY': 103, }
+
+        self.PS4_Controller_MacUbuntu ={'Cross': 0, 'Circle': 1, 'Triangle': 2, 'Square': 3,
+                                'Share': 4, 'Option': 6,
+                                'L1': 9, 'R1': 10,
+                                'LeftStickX': 100,    # axes[0]
+                                'LeftStickY': 101,    # axes[1]
+                                'L2': 102,   # axes[2]
+                                'RightStickX': 103,            # axes[3]
+                                'RightStickY': 104,            # axes[4]
+                                'R2': 105,   # axes[5]
+                                'Touchpad': 15, 'Up': 201, 'Down': 202, 'Left': 203, 'Right': 204,
+                            }
         self.PS5_Controller = {'L1': 9, 'R1': 10,
                                'Triangle': 3, 'Circle': 1, 'Square': 2, 'Cross': 0,
                                'Option': 6, 'Share': 4, 'Touchpad': 15,
@@ -62,8 +74,11 @@ class PygameJoystick:
         elif self.name == 'Wireless Controller':
             self.KeyMapping = self.PS4_Controller_Ding
             print('Use PS4 Controller Mapping (Ding)')
+        elif self.name == 'Sony Interactive Entertainment Wireless Controller':
+            self.KeyMapping = self.PS4_Controller_MacUbuntu
+            print('Use PS4 Controller Mapping (MacUbuntu))')
         else:
-            print('warning: no suitable Key mapping')
+            print('Warning: no suitable Key mapping')
 
     def step(self):
         for event in pygame.event.get():

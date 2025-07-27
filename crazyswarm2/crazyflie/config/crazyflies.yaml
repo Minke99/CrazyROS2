@@ -4,18 +4,18 @@ fileversion: 3
 robots:
   cf231:
     enabled: true
-    uri: radio://0/80/2M/E7E7E7E7E7
+    uri: radio://0/44/2M/E7E7E7E7E7
     initial_position: [0.0, 0.0, 0.0]
     type: cf21  # see robot_types
     # firmware_params:
     #   kalman:
     #     pNAcc_xy: 1.0 # default 0.5
-    # firmware_logging:
-    #   enabled: true
-    #   custom_topics:
-    #     topic_name3: 
-    #       frequency: 1
-    #       vars: ["acc.x", "acc.y"]
+    firmware_logging:
+      enabled: true
+      custom_topics:
+        topic_name3:
+          frequency: 100
+          vars: ["acc.x", "acc.y", "acc.z", "gyro.x"]
     # reference_frame: "odom_cf231" # use a custom reference frame if no global coordinate system is available
 
   cf5:

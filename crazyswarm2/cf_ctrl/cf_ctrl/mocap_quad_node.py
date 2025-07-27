@@ -2,14 +2,18 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
 from geometry_msgs.msg import Twist
+from sensor_msgs.msg import Joy
+import time
 
 # for differentiating data
 from collections import deque
 import math
-from cf_ctrl.joystick_3 import PygameJoystick
-from cf_ctrl.IIR2Filter import IIR2Filter
-from cf_ctrl.standard_pid import PidControlRaw
+from cf_ctrl.tools.joystick_3 import PygameJoystick
+from cf_ctrl.tools.joystick_node import JoystickMapper # chose one
+from cf_ctrl.tools.IIR2Filter import IIR2Filter
+from cf_ctrl.tools.standard_pid import PidControlRaw
 from scipy.spatial.transform import Rotation
+from cf_ctrl.tools.arm_client import ArmClient
 
 class Differentiator:
     def __init__(self, diff_steps=1):
@@ -84,7 +88,15 @@ class Controller(Node):
         self.mocap_qz = 0.0
         self.mocap_qw = 1.0
         print('mocap pose subscriber initialized')
-        self.PJ = PygameJoystick()
+
+        # Joystick node ROS node or a subclass
+        if False:
+            self.PJ = JoystickMapper('PS4 Controller')
+            self.create_subscription(Joy, '/joy', self.joy_callback, 10)
+            self.PJ_Node = True
+        else:
+            self.PJ = PygameJoystick()
+            self.PJ_Node = False
         print('Joystick initialized')
 
         if True:  # Replace with actual condition to check if joystick is available
@@ -100,11 +112,10 @@ class Controller(Node):
             self.desired_yaw = 0
 
         # ctrl loop
-        self.freq = 100
+        self.freq =50
         timer_period = 1/self.freq
-        self.timer = self.create_timer(timer_period, self.ctrl_loop)
-
-            # Filter and Differentiator
+        
+        # Filter and Differentiator
         if True:
             self.Filter_x = IIR2Filter(4, [10], 'lowpass', design='cheby2', rs=5, fs=self.freq)
             self.Filter_y = IIR2Filter(4, [10], 'lowpass', design='cheby2', rs=5, fs=self.freq)
@@ -123,8 +134,18 @@ class Controller(Node):
         self.extpose_waiting_cycles = 10
         self.loop_count = 0
         
+        if True:
+            self.arm_client = ArmClient(node_name="main_node_arm")
+            self.arm_client.arm("/cf231", True)
+            self.get_logger().info("Arm Service Passed")
 
         self.get_logger().info("Mocap ctrl node started")
+
+        self.timer = self.create_timer(timer_period, self.ctrl_loop)
+
+    # Joystick node only
+    def joy_callback(self, msg):
+        self.PJ.update(msg)
 
     def mocap_pose(self, msg):
         self.mocap_x = msg.pose.position.x
@@ -141,7 +162,8 @@ class Controller(Node):
         # code
         self.loop_count += 1
         Abs_time = self.get_clock().now().to_msg().sec + self.get_clock().now().to_msg().nanosec * 1e-9
-        self.PJ.step()
+        if self.PJ_Node == False:
+            self.PJ.step()
 
         if True:
             robot_R = Rotation.from_quat([self.mocap_qx, self.mocap_qy, self.mocap_qz, self.mocap_qw])
@@ -168,10 +190,10 @@ class Controller(Node):
             self.desired_x = JSK_x * self.freq + self.desired_x
             self.desired_y = JSK_y * self.freq + self.desired_y
 
-            if self.RD_high_button.step(self.PJ.get_key('Triangle')):
-                self.desired_z = self.desired_z + 0.1
-            if self.RD_low_button.step(self.PJ.get_key('Square')):
-                self.desired_z = self.desired_z - 0.1
+            # if self.RD_high_button.step(self.PJ.get_key('Up')):
+            #     self.desired_z = self.desired_z + 0.1
+            # if self.RD_low_button.step(self.PJ.get_key('Down')):
+            #     self.desired_z = self.desired_z - 0.1
 
             JS_x = self.PJ.get_key('RightStickX')
             if abs(JS_x) < 0.2:
@@ -184,13 +206,15 @@ class Controller(Node):
                 self.desired_yaw = self.desired_yaw + 360
 
         # buttons and system control
-        if self.RD_circle_button.step(self.PJ.get_key('Circle')):
+        if self.PJ.get_key('Cross'):
             if self.controller_start_flag:
                 self.controller_start_flag = False
                 print('controller stop')
+                time.sleep(0.2)
             else:
                 self.controller_start_flag = True
                 print('controller start')
+                time.sleep(0.2)
         
          # flight controller
         if True:
@@ -227,7 +251,7 @@ class Controller(Node):
                 cmd_pitch = 0.0
                 cmd_roll = 0.0
                 cmd_yaw = 0.0
-                cmd_thrust = 30000.0
+                cmd_thrust = abs(self.PJ.get_key('RightStickY') * 20000)
                 
             else:
                 cmd_pitch = 0.0
@@ -243,11 +267,31 @@ class Controller(Node):
             msg.angular.z = cmd_yaw
             self.cmd_publishers.publish(msg)
 
+        if self.PJ.get_key('Square'):
+            self.shut_down()
+            return
+
+
+    def shut_down(self):
+        msg = Twist()
+        msg.linear.x = 0.0
+        msg.linear.y = 0.0
+        msg.linear.z = 0.0
+        msg.angular.z = 0.0
+        self.cmd_publishers.publish(msg)
+        self.timer.cancel()
+        self.destroy_node() 
+        # rclpy.get_default_context().shutdown() 
+        # self.joy_node.destroy_node()
+        rclpy.shutdown()
+        print('Stop Control Node!')
+            
+
 def main(args=None):
     print('Starting mocap_quad_node...')
     rclpy.init(args=args)
     print('rclpy initialized')
     node = Controller()
     rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+    # node.destroy_node()
+    # rclpy.shutdown()
